@@ -56,6 +56,6 @@ function resetOptions() {
   })
 }
 
-const debouncedTriggerToUpdateProcessedImage = debounce(() => triggerToUpdateProcessedImage.value++, { wait: 500, differentArgs: false })
+const debouncedTriggerToUpdateProcessedImage = debounce(() => triggerToUpdateProcessedImage.value++, { wait: 200, differentArgs: false })
 
 </script>

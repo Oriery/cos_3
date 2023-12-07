@@ -27,7 +27,13 @@ onMounted(() => {
     if (!canvas.value) throw new Error('Canvas not found')
 
     if (props.imageProcessor) {
+      const startTimestamp = performance.now()
+      const notification = pushNotify.promise('Processing image...')
       processImageOntoCanvas(canvas.value, img, props.imageProcessor, props.processorOptions)
+      notification.resolve({
+        message: `Image processed in ${Math.round(performance.now() - startTimestamp)}ms`,
+        duration: 2000,
+      })
     } else {
       drawImageOnCanvas(canvas.value, img)
     }
