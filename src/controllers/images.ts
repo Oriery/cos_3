@@ -13,7 +13,7 @@ export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImage
       ? ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)
       : ctx.getImageData(0, 0, img.width, img.height)
 
-  const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processors.invertColors)
+  const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processors.boxBlur)
 
   ctx.putImageData(newImageData, 0, 0)
 }
