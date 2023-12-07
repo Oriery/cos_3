@@ -1,0 +1,4 @@
+{
+  "availableLocales": ["en", "ru", "de"],
+  "fallbackLocale": "en"
+}
