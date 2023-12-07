@@ -6,6 +6,7 @@ export type ImageProcessingFn = (
 ) => Uint8ClampedArray
 
 export type ImageProcessor = {
+  id: string
   name: string
   fn: ImageProcessingFn,
   options?: ProcessorOption[],
@@ -13,10 +14,12 @@ export type ImageProcessor = {
 
 export const processors : Record<string, ImageProcessor> = {
   invertColors: {
+    id: 'invertColors',
     name: 'Invert Colors',
     fn: invertColors,
   },
   boxBlur: {
+    id: 'boxBlur',
     name: 'Box Blur',
     fn: boxBlur,
     options: [
