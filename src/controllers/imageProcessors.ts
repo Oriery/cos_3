@@ -4,12 +4,17 @@ export type ImageProcessingFn = (
   height: number,
 ) => Uint8ClampedArray
 
-export type ImageProcessingFnWithName = {
+export type ImageProcessor = {
   name: string
   fn: ImageProcessingFn
 }
 
-export const processors: ImageProcessingFnWithName[] = []
+export const processors = {
+  'invertColors': {
+    name: 'Invert Colors',
+    fn: invertColors,
+  },
+}
 
 function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   for (let i = 0; i < data.length; i += 4) {
@@ -20,4 +25,3 @@ function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
 
   return data
 }
-processors.push({ name: 'invertColors', fn: invertColors })

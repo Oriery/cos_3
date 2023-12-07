@@ -1,4 +1,4 @@
-import type { ImageProcessingFn } from './imageProcessors'
+import type { ImageProcessor } from './imageProcessors'
 import { processors } from './imageProcessors'
 
 export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImageElement) {
@@ -13,20 +13,20 @@ export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImage
       ? ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)
       : ctx.getImageData(0, 0, img.width, img.height)
 
-  const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processors[0].fn)
+  const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processors.invertColors)
 
   ctx.putImageData(newImageData, 0, 0)
 }
 
 export function getProcessedImageCopyUsingGivenFn(
   imageData: ImageData,
-  fn: ImageProcessingFn,
+  processor: ImageProcessor,
 ): ImageData {
   // Make a copy
   const data = imageData.data.copyWithin(0, 0)
 
   // Process the copy
-  fn(data, imageData.width, imageData.height)
+  processor.fn(data, imageData.width, imageData.height)
 
   return new ImageData(data, imageData.width, imageData.height)
 }
