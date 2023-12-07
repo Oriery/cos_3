@@ -20,57 +20,6 @@ export const processors = {
   },
 }
 
-class Pixel {
-  r: number
-  g: number
-  b: number
-  a: number
-
-  constructor(r: number, g: number, b: number, a: number) {
-    this.r = r
-    this.g = g
-    this.b = b
-    this.a = a
-  }
-
-  add(pixel: Pixel): Pixel {
-    return new Pixel(this.r + pixel.r, this.g + pixel.g, this.b + pixel.b, this.a + pixel.a)
-  }
-
-  divideByScalar(scalar: number): Pixel {
-    return new Pixel(this.r / scalar, this.g / scalar, this.b / scalar, this.a / scalar)
-  }
-
-  static fromArray(data: Uint8ClampedArray): Pixel[] {
-    const result = []
-
-    for (let i = 0; i < data.length; i += 4) {
-      result.push(new Pixel(data[i], data[i + 1], data[i + 2], data[i + 3]))
-    }
-
-    return result
-  }
-
-  static toMatrix(pixels: Pixel[], width: number): Matrix {
-    const result = []
-
-    for (let i = 0; i < pixels.length; i += width) {
-      result.push(pixels.slice(i, i + width))
-    }
-
-    return result
-  }
-
-  static fromArrayToMatrix(data: Uint8ClampedArray, width: number): Matrix {
-    console.time('fromArrayToMatrix')
-    const res =  Pixel.toMatrix(Pixel.fromArray(data), width)
-    console.timeEnd('fromArrayToMatrix')
-    return res
-  }
-}
-
-type Matrix = Pixel[][]
-
 function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   for (let i = 0; i < data.length; i += 4) {
     data[i] = 255 - data[i] // red
@@ -84,19 +33,27 @@ function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
 function boxBlur(data: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   const newData = new Uint8ClampedArray(data.length)
 
-  const matrix = Pixel.fromArrayToMatrix(data, width)
-
   console.time('boxBlur')
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const neighbors = getWindowAroundPixel(x, y, matrix, 3).flat()
+      const neighbors = getWindowAroundPixel(x, y, data, width, height, 3)
 
-      const avg = neighbors.reduce((acc, pixel) => acc.add(pixel), new Pixel(0, 0, 0, 0)).divideByScalar(neighbors.length)
+      let rSum = 0
+      let gSum = 0
+      let bSum = 0
+      let aSum = 0
+      for (let i = 0; i < neighbors.length; i += 4) {
+        rSum += neighbors[i]
+        gSum += neighbors[i + 1]
+        bSum += neighbors[i + 2]
+        aSum += neighbors[i + 3]
+      }
 
-      newData[4 * (y * width + x)] = avg.r
-      newData[4 * (y * width + x) + 1] = avg.g
-      newData[4 * (y * width + x) + 2] = avg.b
-      newData[4 * (y * width + x) + 3] = avg.a
+      const n = neighbors.length / 4
+      newData[4 * (y * width + x)] = rSum / n
+      newData[4 * (y * width + x) + 1] = gSum / n
+      newData[4 * (y * width + x) + 2] = bSum / n
+      newData[4 * (y * width + x) + 3] = aSum / n
     }
   }
   console.timeEnd('boxBlur')
@@ -105,31 +62,44 @@ function boxBlur(data: Uint8ClampedArray, width: number, height: number): Uint8C
 }
 
 function getWindow(
-  xLeft: number,
-  yLeft: number,
-  xRight: number,
-  yRight: number,
-  matrix: Matrix,
-) : Matrix {
-  const grid = []
+  xFrom: number,
+  yFrom: number,
+  xTo: number,
+  yTo: number,
+  data: Uint8ClampedArray,
+  width: number,
+) : Uint8ClampedArray {
+  //console.log(xFrom, xTo, yFrom, yTo)
+  const len = 4 * (xTo - xFrom) * (yTo - yFrom)
+  if (len <= 0) throw new Error('Invalid array size: ' + len)
+  const res = new Uint8ClampedArray(len)
 
-  for (let y = yLeft; y < yRight; y++) {
-    grid.push(matrix[y].slice(xLeft, xRight))
+  let i = 0
+  for (let y = yFrom; y < yTo; y++) {
+    for (let x = xFrom; x < xTo; x++) {
+      res[i] = data[4 * (y * width + x)]
+      res[i + 1] = data[4 * (y * width + x) + 1]
+      res[i + 2] = data[4 * (y * width + x) + 2]
+      res[i + 3] = data[4 * (y * width + x) + 3]
+      i += 4
+    }
   }
 
-  return grid
+  return res
 }
 
 function getWindowAroundPixel(
   x: number,
   y: number,
-  matrix: Matrix,
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
   radius: number,
-): Matrix {
-  const xLeft = Math.max(x - radius, 0)
-  const xRight = Math.min(x + radius + 1, matrix[0].length)
-  const yLeft = Math.max(y - radius, 0)
-  const yRight = Math.min(y + radius + 1, matrix.length)
+): Uint8ClampedArray {
+  const xFrom = Math.max(x - radius, 0)
+  const yFrom = Math.max(y - radius, 0)
+  const xTo = Math.min(x + radius + 1, width)
+  const yTo = Math.min(y + radius + 1, height)
 
-  return getWindow(xLeft, yLeft, xRight, yRight, matrix)
+  return getWindow(xFrom, yFrom, xTo, yTo, data, width)
 }
