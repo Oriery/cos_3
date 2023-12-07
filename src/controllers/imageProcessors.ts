@@ -2,14 +2,14 @@ export type ImageProcessingFn = (
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  options: Record<string, number>,
+  options: ProcessorOptions,
 ) => Uint8ClampedArray
 
 export type ImageProcessor = {
   id: string
   name: string
   fn: ImageProcessingFn,
-  options?: ProcessorOption[],
+  options: ProcessorOptionDescr[],
 }
 
 export const processors : Record<string, ImageProcessor> = {
@@ -17,6 +17,7 @@ export const processors : Record<string, ImageProcessor> = {
     id: 'invertColors',
     name: 'Invert Colors',
     fn: invertColors,
+    options: [],
   },
   boxBlur: {
     id: 'boxBlur',
@@ -24,8 +25,9 @@ export const processors : Record<string, ImageProcessor> = {
     fn: boxBlur,
     options: [
       {
-        name: 'radius',
-        defaultValue: 2,
+        id: 'radius',
+        name: 'Radius',
+        defaultValue: 1,
         min: 1,
         max: 10,
         step: 1,
@@ -34,13 +36,16 @@ export const processors : Record<string, ImageProcessor> = {
   },
 }
 
-export type ProcessorOption = {
+export type ProcessorOptionDescr = {
+  id: string
   name: string
   defaultValue: number
   min: number
   max: number
   step: number
 }
+
+export type ProcessorOptions = Record<string, number>
 
 function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   for (let i = 0; i < data.length; i += 4) {
@@ -52,15 +57,14 @@ function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   return data
 }
 
-function boxBlur(data: Uint8ClampedArray, width: number, height: number, options: Record<string, number>): Uint8ClampedArray {
+function boxBlur(data: Uint8ClampedArray, width: number, height: number, options: ProcessorOptions): Uint8ClampedArray {
   checkThatAllOptionsAreProvidedAndValid(options, processors.boxBlur)
 
   const newData = new Uint8ClampedArray(data.length)
 
-  console.time('boxBlur')
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const neighbors = getWindowAroundPixel(x, y, data, width, height, 2)
+      const neighbors = getWindowAroundPixel(x, y, data, width, height, options.radius)
 
       let rSum = 0
       let gSum = 0
@@ -80,25 +84,24 @@ function boxBlur(data: Uint8ClampedArray, width: number, height: number, options
       newData[4 * (y * width + x) + 3] = aSum / n
     }
   }
-  console.timeEnd('boxBlur')
 
   return newData
 }
 
 function checkThatAllOptionsAreProvidedAndValid(
-  options: Record<string, number>,
+  options: ProcessorOptions,
   processor: ImageProcessor,
 ): void {
   if (!processor.options) return
 
   for (const option of processor.options) {
-    if (typeof options[option.name] !== 'number') {
-      throw new Error(`Option ${option.name} is not provided`)
+    if (typeof options[option.id] !== 'number') {
+      throw new Error(`Option ${option.id} is not provided`)
     }
 
-    if (options[option.name] < option.min || options[option.name] > option.max) {
+    if (options[option.id] < option.min || options[option.id] > option.max) {
       throw new Error(
-        `Option ${option.name} is out of range: ${options[option.name]} is not in [${option.min}, ${option.max}]`,
+        `Option ${option.id} is out of range: ${options[option.id]} is not in [${option.min}, ${option.max}]`,
       )
     }
   }

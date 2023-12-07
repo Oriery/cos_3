@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mdi/font": "^7.3.67",
+    "advanced-throttle-debounce": "^1.0.9",
     "notivue": "^1.4.4",
     "pinia": "^2.1.6",
     "unimport": "^3.6.0",

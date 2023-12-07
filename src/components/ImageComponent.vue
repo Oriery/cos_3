@@ -8,11 +8,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { processImageOntoCanvas, drawImageOnCanvas } from '@/controllers/images'
-import type { ImageProcessor } from '@/controllers/imageProcessors'
+import type { ImageProcessor, ProcessorOptions } from '@/controllers/imageProcessors'
 
 const props = defineProps<{
   imagePath: string
   imageProcessor?: ImageProcessor
+  processorOptions?: ProcessorOptions
 }>()
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -26,7 +27,7 @@ onMounted(() => {
     if (!canvas.value) throw new Error('Canvas not found')
 
     if (props.imageProcessor) {
-      processImageOntoCanvas(canvas.value, img, props.imageProcessor)
+      processImageOntoCanvas(canvas.value, img, props.imageProcessor, props.processorOptions)
     } else {
       drawImageOnCanvas(canvas.value, img)
     }

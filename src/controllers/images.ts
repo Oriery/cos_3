@@ -1,6 +1,6 @@
-import type { ImageProcessor } from './imageProcessors'
+import type { ImageProcessor, ProcessorOptions } from './imageProcessors'
 
-export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImageElement, processor: ImageProcessor) {
+export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImageElement, processor: ImageProcessor, procOptions?: ProcessorOptions) {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get canvas context')
 
@@ -13,7 +13,7 @@ export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImage
       : ctx.getImageData(0, 0, img.width, img.height)
 
   try {
-    const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processor)
+    const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processor, procOptions)
 
     ctx.putImageData(newImageData, 0, 0)
   } catch (e) {
@@ -29,12 +29,13 @@ export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImage
 function getProcessedImageCopyUsingGivenFn(
   imageData: ImageData,
   processor: ImageProcessor,
+  procOptions?: ProcessorOptions
 ): ImageData {
   // Make a copy
   let data = imageData.data.copyWithin(0, 0)
 
   // Process the copy
-  data = processor.fn(data, imageData.width, imageData.height, {radius: 1})
+  data = processor.fn(data, imageData.width, imageData.height, procOptions ?? {})
 
   return new ImageData(data, imageData.width, imageData.height)
 }
