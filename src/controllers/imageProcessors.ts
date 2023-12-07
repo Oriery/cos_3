@@ -20,30 +20,56 @@ export const processors = {
   },
 }
 
-type Pixel = {
+class Pixel {
   r: number
   g: number
   b: number
   a: number
-}
 
-function addPixels(pixel1: Pixel, pixel2: Pixel): Pixel {
-  return {
-    r: pixel1.r + pixel2.r,
-    g: pixel1.g + pixel2.g,
-    b: pixel1.b + pixel2.b,
-    a: pixel1.a + pixel2.a,
+  constructor(r: number, g: number, b: number, a: number) {
+    this.r = r
+    this.g = g
+    this.b = b
+    this.a = a
+  }
+
+  add(pixel: Pixel): Pixel {
+    return new Pixel(this.r + pixel.r, this.g + pixel.g, this.b + pixel.b, this.a + pixel.a)
+  }
+
+  divideByScalar(scalar: number): Pixel {
+    return new Pixel(this.r / scalar, this.g / scalar, this.b / scalar, this.a / scalar)
+  }
+
+  static fromArray(data: Uint8ClampedArray): Pixel[] {
+    const result = []
+
+    for (let i = 0; i < data.length; i += 4) {
+      result.push(new Pixel(data[i], data[i + 1], data[i + 2], data[i + 3]))
+    }
+
+    return result
+  }
+
+  static toMatrix(pixels: Pixel[], width: number): Matrix {
+    const result = []
+
+    for (let i = 0; i < pixels.length; i += width) {
+      result.push(pixels.slice(i, i + width))
+    }
+
+    return result
+  }
+
+  static fromArrayToMatrix(data: Uint8ClampedArray, width: number): Matrix {
+    console.time('fromArrayToMatrix')
+    const res =  Pixel.toMatrix(Pixel.fromArray(data), width)
+    console.timeEnd('fromArrayToMatrix')
+    return res
   }
 }
 
-function dividePixelByScalar(pixel: Pixel, scalar: number): Pixel {
-  return {
-    r: pixel.r / scalar,
-    g: pixel.g / scalar,
-    b: pixel.b / scalar,
-    a: pixel.a / scalar,
-  }
-}
+type Matrix = Pixel[][]
 
 function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   for (let i = 0; i < data.length; i += 4) {
@@ -56,68 +82,54 @@ function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
 }
 
 function boxBlur(data: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
-  const newData = data.copyWithin(0, 0)
+  const newData = new Uint8ClampedArray(data.length)
 
-  for (let i = 0; i < newData.length; i += 4) {
-    const x = (i / 4) % width
-    const y = Math.floor(i / 4 / width)
+  const matrix = Pixel.fromArrayToMatrix(data, width)
 
-    const pixel = getPixel(x, y, width, height, newData)
+  console.time('boxBlur')
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const neighbors = getWindowAroundPixel(x, y, matrix, 3).flat()
 
-    const neighbors = getNeighbors(x, y, width, height, newData)
+      const avg = neighbors.reduce((acc, pixel) => acc.add(pixel), new Pixel(0, 0, 0, 0)).divideByScalar(neighbors.length)
 
-    const avg = dividePixelByScalar(
-      neighbors.reduce((acc, neighbor) => addPixels(acc, neighbor), pixel),
-      neighbors.length + 1,
-    )
-
-    newData[i] = avg.r
-    newData[i + 1] = avg.g
-    newData[i + 2] = avg.b
-    newData[i + 3] = avg.a
+      newData[4 * (y * width + x)] = avg.r
+      newData[4 * (y * width + x) + 1] = avg.g
+      newData[4 * (y * width + x) + 2] = avg.b
+      newData[4 * (y * width + x) + 3] = avg.a
+    }
   }
+  console.timeEnd('boxBlur')
 
   return newData
 }
 
-function getPixel(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  data: Uint8ClampedArray,
-): Pixel {
-  const i = (x + y * width) * 4
+function getWindow(
+  xLeft: number,
+  yLeft: number,
+  xRight: number,
+  yRight: number,
+  matrix: Matrix,
+) : Matrix {
+  const grid = []
 
-  return {
-    r: data[i],
-    g: data[i + 1],
-    b: data[i + 2],
-    a: data[i + 3],
+  for (let y = yLeft; y < yRight; y++) {
+    grid.push(matrix[y].slice(xLeft, xRight))
   }
+
+  return grid
 }
 
-function getNeighbors(
+function getWindowAroundPixel(
   x: number,
   y: number,
-  width: number,
-  height: number,
-  data: Uint8ClampedArray,
-) {
-  const neighbors = []
+  matrix: Matrix,
+  radius: number,
+): Matrix {
+  const xLeft = Math.max(x - radius, 0)
+  const xRight = Math.min(x + radius + 1, matrix[0].length)
+  const yLeft = Math.max(y - radius, 0)
+  const yRight = Math.min(y + radius + 1, matrix.length)
 
-  if (x > 0) {
-    neighbors.push(getPixel(x - 1, y, width, height, data))
-  }
-  if (x < width - 1) {
-    neighbors.push(getPixel(x + 1, y, width, height, data))
-  }
-  if (y > 0) {
-    neighbors.push(getPixel(x, y - 1, width, height, data))
-  }
-  if (y < height - 1) {
-    neighbors.push(getPixel(x, y + 1, width, height, data))
-  }
-
-  return neighbors
+  return getWindow(xLeft, yLeft, xRight, yRight, matrix)
 }
