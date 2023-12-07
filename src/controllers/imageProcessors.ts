@@ -36,7 +36,7 @@ function boxBlur(data: Uint8ClampedArray, width: number, height: number): Uint8C
   console.time('boxBlur')
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const neighbors = getWindowAroundPixel(x, y, data, width, height, 3)
+      const neighbors = getWindowAroundPixel(x, y, data, width, height, 2)
 
       let rSum = 0
       let gSum = 0
@@ -69,18 +69,19 @@ function getWindow(
   data: Uint8ClampedArray,
   width: number,
 ) : Uint8ClampedArray {
-  //console.log(xFrom, xTo, yFrom, yTo)
-  const len = 4 * (xTo - xFrom) * (yTo - yFrom)
-  if (len <= 0) throw new Error('Invalid array size: ' + len)
-  const res = new Uint8ClampedArray(len)
+  const res = new Uint8ClampedArray(4 * (xTo - xFrom) * (yTo - yFrom))
 
   let i = 0
+  let y1 = 0
+  let ind = 0
   for (let y = yFrom; y < yTo; y++) {
+    y1 = y * width
     for (let x = xFrom; x < xTo; x++) {
-      res[i] = data[4 * (y * width + x)]
-      res[i + 1] = data[4 * (y * width + x) + 1]
-      res[i + 2] = data[4 * (y * width + x) + 2]
-      res[i + 3] = data[4 * (y * width + x) + 3]
+      ind = 4 * (y1 + x)
+      res[i] = data[ind]
+      res[i + 1] = data[ind + 1]
+      res[i + 2] = data[ind + 2]
+      res[i + 3] = data[ind + 3]
       i += 4
     }
   }
