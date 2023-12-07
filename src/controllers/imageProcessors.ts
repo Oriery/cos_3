@@ -2,14 +2,16 @@ export type ImageProcessingFn = (
   data: Uint8ClampedArray,
   width: number,
   height: number,
+  options: Record<string, number>,
 ) => Uint8ClampedArray
 
 export type ImageProcessor = {
   name: string
-  fn: ImageProcessingFn
+  fn: ImageProcessingFn,
+  options?: ProcessorOption[],
 }
 
-export const processors = {
+export const processors : Record<string, ImageProcessor> = {
   invertColors: {
     name: 'Invert Colors',
     fn: invertColors,
@@ -17,7 +19,24 @@ export const processors = {
   boxBlur: {
     name: 'Box Blur',
     fn: boxBlur,
+    options: [
+      {
+        name: 'radius',
+        defaultValue: 2,
+        min: 1,
+        max: 10,
+        step: 1,
+      },
+    ],
   },
+}
+
+export type ProcessorOption = {
+  name: string
+  defaultValue: number
+  min: number
+  max: number
+  step: number
 }
 
 function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
@@ -30,7 +49,9 @@ function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   return data
 }
 
-function boxBlur(data: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
+function boxBlur(data: Uint8ClampedArray, width: number, height: number, options: Record<string, number>): Uint8ClampedArray {
+  checkThatAllOptionsAreProvidedAndValid(options, processors.boxBlur)
+
   const newData = new Uint8ClampedArray(data.length)
 
   console.time('boxBlur')
@@ -59,6 +80,25 @@ function boxBlur(data: Uint8ClampedArray, width: number, height: number): Uint8C
   console.timeEnd('boxBlur')
 
   return newData
+}
+
+function checkThatAllOptionsAreProvidedAndValid(
+  options: Record<string, number>,
+  processor: ImageProcessor,
+): void {
+  if (!processor.options) return
+
+  for (const option of processor.options) {
+    if (!options[option.name]) {
+      throw new Error(`Option ${option.name} is not provided`)
+    }
+
+    if (options[option.name] < option.min || options[option.name] > option.max) {
+      throw new Error(
+        `Option ${option.name} is out of range: ${options[option.name]} is not in [${option.min}, ${option.max}]`,
+      )
+    }
+  }
 }
 
 function getWindow(
