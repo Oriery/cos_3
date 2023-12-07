@@ -20,6 +20,9 @@ export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImage
     // fill the canvas with white
     ctx.fillStyle = 'white'
     ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+    // rethrow the error
+    throw e
   }
 }
 
@@ -31,7 +34,7 @@ function getProcessedImageCopyUsingGivenFn(
   let data = imageData.data.copyWithin(0, 0)
 
   // Process the copy
-  data = processor.fn(data, imageData.width, imageData.height, {radius: 2})
+  data = processor.fn(data, imageData.width, imageData.height, {radius: 1})
 
   return new ImageData(data, imageData.width, imageData.height)
 }

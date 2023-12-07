@@ -89,7 +89,7 @@ function checkThatAllOptionsAreProvidedAndValid(
   if (!processor.options) return
 
   for (const option of processor.options) {
-    if (!options[option.name]) {
+    if (typeof options[option.name] !== 'number') {
       throw new Error(`Option ${option.name} is not provided`)
     }
 
