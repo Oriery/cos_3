@@ -57,6 +57,21 @@ export const processors: Record<string, ImageProcessor> = {
       }
     ],
   },
+  medianFilter: {
+    id: 'medianFilter',
+    name: 'Median Filter',
+    fn: medianFilter,
+    options: [
+      {
+        id: 'radius',
+        name: 'Radius',
+        defaultValue: 2,
+        min: 1,
+        max: 5,
+        step: 1,
+      },
+    ],
+  },
 }
 
 export type ProcessorOptionDescr = {
@@ -182,6 +197,59 @@ function getGaussianKernel(radius: number, stdDeviation: number): number[] {
   }
 
   return kernel
+}
+
+function medianFilter(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: ProcessorOptions,
+): Uint8ClampedArray {
+  checkThatAllOptionsAreProvidedAndValid(options, processors.medianFilter)
+
+  const newData = new Uint8ClampedArray(data.length)
+
+  const windowSize = 2 * options.radius + 1
+  const window = new Uint8ClampedArray(windowSize * windowSize * 4)
+
+  for (let y = 0; y < height; y++) {
+    const y1 = y * width
+    for (let x = 0; x < width; x++) {
+      const neighbors = getWindowAroundPixel(x, y, data, width, height, options.radius)
+
+      for (let i = 0; i < neighbors.length; i += 4) {
+        window[i] = neighbors[i]
+        window[i + 1] = neighbors[i + 1]
+        window[i + 2] = neighbors[i + 2]
+        window[i + 3] = neighbors[i + 3]
+      }
+
+      const rMedian = getMedian(window, 0)
+      const gMedian = getMedian(window, 1)
+      const bMedian = getMedian(window, 2)
+      const aMedian = getMedian(window, 3)
+
+      newData[4 * (y1 + x)] = rMedian
+      newData[4 * (y1 + x) + 1] = gMedian
+      newData[4 * (y1 + x) + 2] = bMedian
+      newData[4 * (y1 + x) + 3] = aMedian
+    }
+  }
+
+  return newData
+}
+
+function getMedian(data: Uint8ClampedArray, channel: number): number {
+  const windowSize = Math.sqrt(data.length / 4)
+  const window = new Uint8ClampedArray(windowSize * windowSize)
+
+  for (let i = 0; i < data.length; i += 4) {
+    window[i / 4] = data[i + channel]
+  }
+
+  window.sort((a, b) => a - b)
+
+  return window[Math.floor(window.length / 2)]
 }
 
 function checkThatAllOptionsAreProvidedAndValid(
