@@ -40,7 +40,7 @@ import { ref, computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import { debounce } from 'advanced-throttle-debounce';
 
-const selectedProcessorId : Ref<string> = ref(processors.boxBlur.id)
+const selectedProcessorId : Ref<string> = ref(processors[Object.keys(processors)[Object.keys(processors).length - 1]].id) // select the last processor by default
 const possibleProcessorsIds = ref(Object.values(processors))
 const selectedProcessor = computed(() => processors[selectedProcessorId.value])
 const selectedProcessorOptions : Ref<ProcessorOptions> = ref({})

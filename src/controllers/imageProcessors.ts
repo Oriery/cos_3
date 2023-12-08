@@ -27,11 +27,34 @@ export const processors: Record<string, ImageProcessor> = {
       {
         id: 'radius',
         name: 'Radius',
-        defaultValue: 1,
+        defaultValue: 2,
         min: 1,
         max: 10,
         step: 1,
       },
+    ],
+  },
+  gaussianBlur: {
+    id: 'gaussianBlur',
+    name: 'Gaussian Blur',
+    fn: gaussianBlur,
+    options: [
+      {
+        id: 'radius',
+        name: 'Radius',
+        defaultValue: 10,
+        min: 1,
+        max: 10,
+        step: 1,
+      },
+      {
+        id: 'stdDeviation',
+        name: String.fromCharCode(0x03c3),
+        defaultValue: 3,
+        min: 0.5,
+        max: 10,
+        step: 0.5,
+      }
     ],
   },
 }
@@ -93,6 +116,72 @@ function boxBlur(
   }
 
   return newData
+}
+
+function gaussianBlur(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: ProcessorOptions,
+): Uint8ClampedArray {
+  checkThatAllOptionsAreProvidedAndValid(options, processors.gaussianBlur)
+
+  const newData = new Uint8ClampedArray(data.length)
+
+  const kernel = getGaussianKernel(options.radius, options.stdDeviation)
+
+  for (let y = 0; y < height; y++) {
+    const y1 = y * width
+    for (let x = 0; x < width; x++) {
+      const neighbors = getWindowAroundPixel(x, y, data, width, height, options.radius)
+
+      let rSum = 0
+      let gSum = 0
+      let bSum = 0
+      let aSum = 0
+      for (let i = 0; i < neighbors.length; i += 4) {
+        rSum += neighbors[i] * kernel[i / 4]
+        gSum += neighbors[i + 1] * kernel[i / 4]
+        bSum += neighbors[i + 2] * kernel[i / 4]
+        aSum += neighbors[i + 3] * kernel[i / 4]
+      }
+
+      newData[4 * (y1 + x)] = rSum
+      newData[4 * (y1 + x) + 1] = gSum
+      newData[4 * (y1 + x) + 2] = bSum
+      newData[4 * (y1 + x) + 3] = aSum
+    }
+  }
+
+  return newData
+}
+
+function getGaussianKernel(radius: number, stdDeviation: number): number[] {
+  const kernelSize = 2 * radius + 1
+  const kernel = new Array(kernelSize * kernelSize)
+
+  const kernelCenter = Math.floor(kernelSize / 2)
+
+  let sum = 0
+  for (let i = 0; i < kernel.length; i++) {
+    const x = i % kernelSize
+    const y = Math.floor(i / kernelSize)
+
+    const xDiff = x - kernelCenter
+    const yDiff = y - kernelCenter
+
+    const dist = Math.sqrt(xDiff * xDiff + yDiff * yDiff)
+
+    const val = Math.exp(-(dist * dist) / (2 * stdDeviation * stdDeviation))
+    kernel[i] = val
+    sum += val
+  }
+
+  for (let i = 0; i < kernel.length; i++) {
+    kernel[i] /= sum
+  }
+
+  return kernel
 }
 
 function checkThatAllOptionsAreProvidedAndValid(
