@@ -72,6 +72,12 @@ export const processors: Record<string, ImageProcessor> = {
       },
     ],
   },
+  sobelOperator: {
+    id: 'sobelOperator',
+    name: 'Sobel Operator',
+    fn: sobelOperator,
+    options: [],
+  },
 }
 
 export type ProcessorOptionDescr = {
@@ -250,6 +256,66 @@ function getMedian(data: Uint8ClampedArray, channel: number): number {
   window.sort((a, b) => a - b)
 
   return window[Math.floor(window.length / 2)]
+}
+
+function sobelOperator(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: ProcessorOptions,
+): Uint8ClampedArray {
+  const newData = new Uint8ClampedArray(data.length)
+
+  const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1]
+  const kernelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1]
+
+  const windowSize = 3
+  const window = new Uint8ClampedArray(windowSize * windowSize * 4)
+
+  for (let y = 0; y < height; y++) {
+    const y1 = y * width
+    for (let x = 0; x < width; x++) {
+      const neighbors = getWindowAroundPixel(x, y, data, width, height, 1)
+
+      for (let i = 0; i < neighbors.length; i += 4) {
+        window[i] = neighbors[i]
+        window[i + 1] = neighbors[i + 1]
+        window[i + 2] = neighbors[i + 2]
+        window[i + 3] = neighbors[i + 3]
+      }
+
+      const rX = convolve(window, kernelX, 0)
+      const gX = convolve(window, kernelX, 1)
+      const bX = convolve(window, kernelX, 2)
+      //const aX = convolve(window, kernelX, 3)
+
+      const rY = convolve(window, kernelY, 0)
+      const gY = convolve(window, kernelY, 1)
+      const bY = convolve(window, kernelY, 2)
+      //const aY = convolve(window, kernelY, 3)
+
+      const r = Math.sqrt(rX * rX + rY * rY)
+      const g = Math.sqrt(gX * gX + gY * gY)
+      const b = Math.sqrt(bX * bX + bY * bY)
+      //const a = Math.sqrt(aX * aX + aY * aY)
+
+      newData[4 * (y1 + x)] = r
+      newData[4 * (y1 + x) + 1] = g
+      newData[4 * (y1 + x) + 2] = b
+      newData[4 * (y1 + x) + 3] = 255 // force alpha to 255
+    }
+  }
+
+  return newData
+}
+
+function convolve(data: Uint8ClampedArray, kernel: number[], channel: number): number {
+  let sum = 0
+  for (let i = 0; i < data.length; i += 4) {
+    sum += data[i + channel] * kernel[i / 4]
+  }
+
+  return sum
 }
 
 function checkThatAllOptionsAreProvidedAndValid(
