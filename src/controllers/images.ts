@@ -6,11 +6,7 @@ export function processImageOntoCanvas(canvas: HTMLCanvasElement, img: HTMLImage
 
   drawImageOnCanvas(canvas, img)
 
-  //const imageData = ctx.getImageData(0, 0, img.width, img.height)
-  const imageData =
-    img.naturalWidth && img.naturalHeight
-      ? ctx.getImageData(0, 0, img.naturalWidth, img.naturalHeight)
-      : ctx.getImageData(0, 0, img.width, img.height)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
 
   try {
     const newImageData = getProcessedImageCopyUsingGivenFn(imageData, processor, procOptions)

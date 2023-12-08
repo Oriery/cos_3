@@ -142,16 +142,8 @@ function getWindow(
   for (let y = yFrom; y < yTo; y++) {
     y1 = y * width
 
-    // maybe duplicate left pixel
-    for (let x = 0; x < leftEdgeDuplicates; x++) {
-      ind = 4 * (y1 + xFrom)
-      res[i] = data[ind]
-      res[i + 1] = data[ind + 1]
-      res[i + 2] = data[ind + 2]
-      res[i + 3] = data[ind + 3]
-      i += 4
-    }
-
+    let duplicatedLeftCols = 0
+    let duplicatedRightCols = 0
     for (let x = xFrom; x < xTo; x++) {
       ind = 4 * (y1 + x)
       res[i] = data[ind]
@@ -159,16 +151,16 @@ function getWindow(
       res[i + 2] = data[ind + 2]
       res[i + 3] = data[ind + 3]
       i += 4
-    }
 
-    // maybe duplicate right pixel
-    for (let x = 0; x < rightEdgeDuplicates; x++) {
-      ind = 4 * (y1 + xTo - 1)
-      res[i] = data[ind]
-      res[i + 1] = data[ind + 1]
-      res[i + 2] = data[ind + 2]
-      res[i + 3] = data[ind + 3]
-      i += 4
+      // maybe duplicate left pixel
+      if (duplicatedLeftCols < leftEdgeDuplicates) {
+        duplicatedLeftCols++
+        x--
+      } else if (x == xTo - 1 && duplicatedRightCols < rightEdgeDuplicates) {
+        // duplicate right pixel
+        duplicatedRightCols++
+        x--
+      }
     }
 
     // maybe duplicate first row
@@ -176,7 +168,7 @@ function getWindow(
       duplicatedFirstRows++
       y--
     } else if (y == yTo - 1 && duplicatedLastRows < bottomEdgeDuplicates) {
-      // maybe duplicate last row
+      // duplicate last row
       duplicatedLastRows++
       y--
     }
@@ -210,7 +202,7 @@ function getWindowAroundPixel(
   const topEdgeDuplicates = yFrom - yFromWanted
   const bottomEdgeDuplicates = yToWanted - yTo
 
-  return getWindow(
+  const res = getWindow(
     xFrom,
     yFrom,
     xTo,
@@ -222,4 +214,6 @@ function getWindowAroundPixel(
     topEdgeDuplicates,
     bottomEdgeDuplicates,
   )
+
+  return res
 }

@@ -1,6 +1,6 @@
 <template>
-  <div class="flex flex-row gap-2 p-2 bg-amber-700 rounded">
-    <ImageComponent image-path="/apples.png" />
+  <div class="flex flex-row gap-2 p-2 bg-blue-700 rounded">
+    <ImageComponent image-path="/apples_small.png" />
     <div class="flex flex-col gap-2 w-[30rem]">
       <div>
         <v-select
@@ -24,7 +24,7 @@
       </div>
     </div>
     <ImageComponent
-      image-path="/apples.png"
+      image-path="/apples_small.png"
       :image-processor="processors[selectedProcessorId]"
       :key="selectedProcessorId + triggerToUpdateProcessedImage"
       :processor-options="selectedProcessorOptions"

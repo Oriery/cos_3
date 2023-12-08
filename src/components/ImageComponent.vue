@@ -32,7 +32,7 @@ onMounted(() => {
       processImageOntoCanvas(canvas.value, img, props.imageProcessor, props.processorOptions)
       notification.resolve({
         message: `Image processed in ${Math.round(performance.now() - startTimestamp)}ms`,
-        duration: 2000,
+        duration: 1000,
       })
     } else {
       drawImageOnCanvas(canvas.value, img)
