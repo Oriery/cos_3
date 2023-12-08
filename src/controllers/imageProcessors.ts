@@ -8,11 +8,11 @@ export type ImageProcessingFn = (
 export type ImageProcessor = {
   id: string
   name: string
-  fn: ImageProcessingFn,
-  options: ProcessorOptionDescr[],
+  fn: ImageProcessingFn
+  options: ProcessorOptionDescr[]
 }
 
-export const processors : Record<string, ImageProcessor> = {
+export const processors: Record<string, ImageProcessor> = {
   invertColors: {
     id: 'invertColors',
     name: 'Invert Colors',
@@ -57,10 +57,18 @@ function invertColors(data: Uint8ClampedArray): Uint8ClampedArray {
   return data
 }
 
-function boxBlur(data: Uint8ClampedArray, width: number, height: number, options: ProcessorOptions): Uint8ClampedArray {
+function boxBlur(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: ProcessorOptions,
+): Uint8ClampedArray {
   checkThatAllOptionsAreProvidedAndValid(options, processors.boxBlur)
 
   const newData = new Uint8ClampedArray(data.length)
+
+  const pixelsInWindow = Math.pow(2 * options.radius + 1, 2)
+  const invPixelsInWindow = 1 / pixelsInWindow
 
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -77,11 +85,10 @@ function boxBlur(data: Uint8ClampedArray, width: number, height: number, options
         aSum += neighbors[i + 3]
       }
 
-      const n = neighbors.length / 4
-      newData[4 * (y * width + x)] = rSum / n
-      newData[4 * (y * width + x) + 1] = gSum / n
-      newData[4 * (y * width + x) + 2] = bSum / n
-      newData[4 * (y * width + x) + 3] = aSum / n
+      newData[4 * (y * width + x)] = rSum * invPixelsInWindow
+      newData[4 * (y * width + x) + 1] = gSum * invPixelsInWindow
+      newData[4 * (y * width + x) + 2] = bSum * invPixelsInWindow
+      newData[4 * (y * width + x) + 3] = aSum * invPixelsInWindow
     }
   }
 
@@ -101,7 +108,9 @@ function checkThatAllOptionsAreProvidedAndValid(
 
     if (options[option.id] < option.min || options[option.id] > option.max) {
       throw new Error(
-        `Option ${option.id} is out of range: ${options[option.id]} is not in [${option.min}, ${option.max}]`,
+        `Option ${option.id} is out of range: ${options[option.id]} is not in [${option.min}, ${
+          option.max
+        }]`,
       )
     }
   }
@@ -114,14 +123,35 @@ function getWindow(
   yTo: number,
   data: Uint8ClampedArray,
   width: number,
-) : Uint8ClampedArray {
-  const res = new Uint8ClampedArray(4 * (xTo - xFrom) * (yTo - yFrom))
+  leftEdgeDuplicates: number = 0,
+  rightEdgeDuplicates: number = 0,
+  topEdgeDuplicates: number = 0,
+  bottomEdgeDuplicates: number = 0,
+): Uint8ClampedArray {
+  const outLength =
+    4 *
+    (xTo - xFrom + leftEdgeDuplicates + rightEdgeDuplicates) *
+    (yTo - yFrom + topEdgeDuplicates + bottomEdgeDuplicates)
+  const res = new Uint8ClampedArray(outLength)
 
   let i = 0
   let y1 = 0
   let ind = 0
+  let duplicatedFirstRows = 0
+  let duplicatedLastRows = 0
   for (let y = yFrom; y < yTo; y++) {
     y1 = y * width
+
+    // maybe duplicate left pixel
+    for (let x = 0; x < leftEdgeDuplicates; x++) {
+      ind = 4 * (y1 + xFrom)
+      res[i] = data[ind]
+      res[i + 1] = data[ind + 1]
+      res[i + 2] = data[ind + 2]
+      res[i + 3] = data[ind + 3]
+      i += 4
+    }
+
     for (let x = xFrom; x < xTo; x++) {
       ind = 4 * (y1 + x)
       res[i] = data[ind]
@@ -130,6 +160,30 @@ function getWindow(
       res[i + 3] = data[ind + 3]
       i += 4
     }
+
+    // maybe duplicate right pixel
+    for (let x = 0; x < rightEdgeDuplicates; x++) {
+      ind = 4 * (y1 + xTo - 1)
+      res[i] = data[ind]
+      res[i + 1] = data[ind + 1]
+      res[i + 2] = data[ind + 2]
+      res[i + 3] = data[ind + 3]
+      i += 4
+    }
+
+    // maybe duplicate first row
+    if (duplicatedFirstRows < topEdgeDuplicates) {
+      duplicatedFirstRows++
+      y--
+    } else if (y == yTo - 1 && duplicatedLastRows < bottomEdgeDuplicates) {
+      // maybe duplicate last row
+      duplicatedLastRows++
+      y--
+    }
+  }
+
+  if (i != outLength) {
+    throw new Error(`i (${i}) != outLength (${outLength})`)
   }
 
   return res
@@ -143,10 +197,29 @@ function getWindowAroundPixel(
   height: number,
   radius: number,
 ): Uint8ClampedArray {
-  const xFrom = Math.max(x - radius, 0)
-  const yFrom = Math.max(y - radius, 0)
-  const xTo = Math.min(x + radius + 1, width)
-  const yTo = Math.min(y + radius + 1, height)
+  const xFromWanted = x - radius
+  const yFromWanted = y - radius
+  const xToWanted = x + radius + 1
+  const yToWanted = y + radius + 1
+  const xFrom = Math.max(xFromWanted, 0)
+  const yFrom = Math.max(yFromWanted, 0)
+  const xTo = Math.min(xToWanted, width)
+  const yTo = Math.min(yToWanted, height)
+  const leftEdgeDuplicates = xFrom - xFromWanted
+  const rightEdgeDuplicates = xToWanted - xTo
+  const topEdgeDuplicates = yFrom - yFromWanted
+  const bottomEdgeDuplicates = yToWanted - yTo
 
-  return getWindow(xFrom, yFrom, xTo, yTo, data, width)
+  return getWindow(
+    xFrom,
+    yFrom,
+    xTo,
+    yTo,
+    data,
+    width,
+    leftEdgeDuplicates,
+    rightEdgeDuplicates,
+    topEdgeDuplicates,
+    bottomEdgeDuplicates,
+  )
 }
