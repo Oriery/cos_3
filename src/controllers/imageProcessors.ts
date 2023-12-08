@@ -44,7 +44,7 @@ export const processors: Record<string, ImageProcessor> = {
         name: 'Radius',
         defaultValue: 10,
         min: 1,
-        max: 10,
+        max: 20,
         step: 1,
       },
       {
@@ -54,7 +54,7 @@ export const processors: Record<string, ImageProcessor> = {
         min: 0.5,
         max: 10,
         step: 0.5,
-      }
+      },
     ],
   },
   medianFilter: {

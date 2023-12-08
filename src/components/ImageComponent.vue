@@ -22,6 +22,7 @@ onMounted(() => {
   if (!canvas.value) throw new Error('Canvas not found')
 
   const img = new Image()
+  img.crossOrigin = 'anonymous'
 
   img.onload = () => {
     if (!canvas.value) throw new Error('Canvas not found')
