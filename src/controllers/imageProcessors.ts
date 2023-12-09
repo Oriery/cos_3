@@ -345,13 +345,14 @@ function getWindow(
   yTo: number,
   data: Uint8ClampedArray,
   width: number,
+  numberOfChannels: number,
   leftEdgeDuplicates: number = 0,
   rightEdgeDuplicates: number = 0,
   topEdgeDuplicates: number = 0,
   bottomEdgeDuplicates: number = 0,
 ): Uint8ClampedArray {
   const outLength =
-    4 *
+    numberOfChannels *
     (xTo - xFrom + leftEdgeDuplicates + rightEdgeDuplicates) *
     (yTo - yFrom + topEdgeDuplicates + bottomEdgeDuplicates)
   const res = new Uint8ClampedArray(outLength)
@@ -367,12 +368,11 @@ function getWindow(
     let duplicatedLeftCols = 0
     let duplicatedRightCols = 0
     for (let x = xFrom; x < xTo; x++) {
-      ind = 4 * (y1 + x)
-      res[i] = data[ind]
-      res[i + 1] = data[ind + 1]
-      res[i + 2] = data[ind + 2]
-      res[i + 3] = data[ind + 3]
-      i += 4
+      ind = numberOfChannels * (y1 + x)
+      for (let chInd = 0; chInd < numberOfChannels; chInd++) {
+        res[i + chInd] = data[ind + chInd]
+      }
+      i += numberOfChannels
 
       // maybe duplicate left pixel
       if (duplicatedLeftCols < leftEdgeDuplicates) {
@@ -397,7 +397,7 @@ function getWindow(
   }
 
   if (i != outLength) {
-    throw new Error(`i (${i}) != outLength (${outLength})`)
+    throw new Error(`i (${i}) != outLength (${outLength}). Parameters:\nxFrom=${xFrom},\nyFrom=${yFrom},\nxTo=${xTo},\nyTo=${yTo},\nwidth=${width},\nnumberOfChannels=${numberOfChannels},\nleftEdgeDuplicates=${leftEdgeDuplicates},\nrightEdgeDuplicates=${rightEdgeDuplicates},\ntopEdgeDuplicates=${topEdgeDuplicates},\nbottomEdgeDuplicates=${bottomEdgeDuplicates}`)
   }
 
   return res
@@ -410,6 +410,7 @@ export function getWindowAroundPixel(
   width: number,
   height: number,
   radius: number,
+  numberOfChannels: number = 4,
 ): Uint8ClampedArray {
   const xFromWanted = x - radius
   const yFromWanted = y - radius
@@ -431,6 +432,7 @@ export function getWindowAroundPixel(
     yTo,
     data,
     width,
+    numberOfChannels,
     leftEdgeDuplicates,
     rightEdgeDuplicates,
     topEdgeDuplicates,

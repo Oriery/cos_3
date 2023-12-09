@@ -27,7 +27,7 @@ onMounted(() => {
       const notification = pushNotify.promise('Processing image...')
       await processImageOntoCanvas(canvas.value, img, props.imageProcessor, props.processorOptions)
       const timeTook = Math.round(performance.now() - startTimestamp)
-      console.log(`Correlation computed in ${timeTook}ms`)
+      console.log(`Image processed in ${timeTook}ms`)
       notification.resolve({
         message: `Image processed in ${timeTook}ms`,
         duration: 1000,

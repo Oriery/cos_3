@@ -1,7 +1,4 @@
 import type { ImageProcessor, ProcessorOptions } from './imageProcessors'
-import { getWindowAroundPixel } from './imageProcessors'
-
-const FORCED_WIDTH = 200
 
 export async function processImageOntoCanvas(
   canvas: HTMLCanvasElement,
@@ -28,7 +25,7 @@ export async function processImageOntoCanvas(
   }
 }
 
-async function drawImageDataOnCanvas(canvas: HTMLCanvasElement, imageData: ImageData) {
+export async function drawImageDataOnCanvas(canvas: HTMLCanvasElement, imageData: ImageData) {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get canvas context')
 
@@ -36,7 +33,12 @@ async function drawImageDataOnCanvas(canvas: HTMLCanvasElement, imageData: Image
   ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
 }
 
-async function drawDataOnCanvas(canvas: HTMLCanvasElement, data: Uint8ClampedArray, width: number, height: number) {
+export async function drawDataOnCanvas(
+  canvas: HTMLCanvasElement,
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+) {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get canvas context')
 
@@ -86,7 +88,7 @@ export async function drawCorrelationOf2ImagesOnCanvas(
   const ratio = img1.width / img1.height
   canvas.height = canvas.width / ratio
 
-  const data = correlationFunction(
+  const correlationImageData = getCorrelationData(
     getDataOfImage(img1),
     img1.width,
     img1.height,
@@ -95,76 +97,11 @@ export async function drawCorrelationOf2ImagesOnCanvas(
     img2.height,
   )
 
-  console.log('data', data)
+  console.log('correlationImageData', correlationImageData)
 
-  drawDataOnCanvas(canvas, data, img1.width, img1.height)
-}
+  drawImageDataOnCanvas(canvas, correlationImageData)
 
-function correlationFunction(
-  data1: Uint8ClampedArray,
-  width1: number,
-  height1: number,
-  data2: Uint8ClampedArray,
-  width2: number,
-  height2: number,
-): Uint8ClampedArray {
-  const newData = new Uint8ClampedArray(data1.length)
-
-  const windowSize = 2 * Math.max(width2, height2)
-  const window = new Uint8ClampedArray(windowSize * windowSize * 4)
-
-  const normalizationFactor = 1 / (windowSize * windowSize)
-
-  for (let y = 0; y < height1; y++) {
-    const y1 = y * width1
-    for (let x = 0; x < width1; x++) {
-      const neighbors = getWindowAroundPixel(x, y, data1, width1, height1, 1)
-
-      for (let i = 0; i < neighbors.length; i += 4) {
-        window[i] = neighbors[i]
-        window[i + 1] = neighbors[i + 1]
-        window[i + 2] = neighbors[i + 2]
-        window[i + 3] = neighbors[i + 3]
-      }
-
-      const r = correlation(window, data2, 0)
-      const g = correlation(window, data2, 1)
-      const b = correlation(window, data2, 2)
-      //const a = correlation(window, data2, 3)
-
-      newData[4 * (y1 + x)] = r * normalizationFactor
-      newData[4 * (y1 + x) + 1] = g * normalizationFactor
-      newData[4 * (y1 + x) + 2] = b * normalizationFactor
-      //newData[4 * (y1 + x) + 3] = a * normalizationFactor
-      newData[4 * (y1 + x) + 3] = 255
-    }
-  }
-
-  return newData
-}
-
-function correlation(data1: Uint8ClampedArray, data2: Uint8ClampedArray, channel: number): number {
-  let sum = 0
-  for (let i = 0; i < data2.length; i += 4) {
-    sum += data1[i + channel] * data2[i + channel]
-  }
-
-  return sum
-}
-
-function convertToGrayscale(data: Uint8ClampedArray): Uint8ClampedArray {
-  const newData = new Uint8ClampedArray(data.length / 4)
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i]
-    const g = data[i + 1]
-    const b = data[i + 2]
-    const a = data[i + 3]
-
-    newData[i / 4] = (r + g + b) / 3
-  }
-
-  return newData
+  return correlationImageData
 }
 
 export function getImage(url: string): Promise<HTMLImageElement> {
@@ -177,7 +114,7 @@ export function getImage(url: string): Promise<HTMLImageElement> {
   })
 }
 
-function getDataOfImage(img: HTMLImageElement): Uint8ClampedArray {
+export function getDataOfImage(img: HTMLImageElement): Uint8ClampedArray {
   const canvas = document.createElement('canvas')
   canvas.width = img.width
   canvas.height = img.height
@@ -192,7 +129,7 @@ function getDataOfImage(img: HTMLImageElement): Uint8ClampedArray {
   return imageData.data
 }
 
-function getImageDataOfImage(img: HTMLImageElement): ImageData {
+export function getImageDataOfImage(img: HTMLImageElement): ImageData {
   const canvas = document.createElement('canvas')
   canvas.width = img.width
   canvas.height = img.height
@@ -202,9 +139,133 @@ function getImageDataOfImage(img: HTMLImageElement): ImageData {
 
   const ratio = img.width / img.height
 
-  ctx.drawImage(img, 0, 0, FORCED_WIDTH, FORCED_WIDTH / ratio)
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.width / ratio)
 
-  const imageData = ctx.getImageData(0, 0, FORCED_WIDTH, FORCED_WIDTH / ratio)
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.width / ratio)
 
   return imageData
+}
+
+export function convertToGrayscale(data: Uint8ClampedArray): Uint8ClampedArray {
+  const newData = new Uint8ClampedArray(data.length / 4)
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+
+    newData[i / 4] = (r + g + b) / 3
+  }
+
+  return newData
+}
+
+export function convertToColor(data: Uint8ClampedArray): Uint8ClampedArray {
+  const newData = new Uint8ClampedArray(data.length * 4)
+
+  for (let i = 0; i < data.length; i++) {
+    const color = data[i]
+
+    newData[i * 4] = color
+    newData[i * 4 + 1] = color
+    newData[i * 4 + 2] = color
+    newData[i * 4 + 3] = 255
+  }
+
+  return newData
+}
+
+function getCorrelationData(
+  data1: Uint8ClampedArray,
+  width1: number,
+  height1: number,
+  data2: Uint8ClampedArray,
+  width2: number,
+  height2: number,
+): ImageData {
+  let data1Grayscale = convertToGrayscale(data1)
+  let data2Grayscale = convertToGrayscale(data2)
+
+  // sort the data by size
+  if (data1Grayscale.length < data2Grayscale.length) {
+    const tmp = data1Grayscale
+    data1Grayscale = data2Grayscale
+    data2Grayscale = tmp
+  }
+
+  const correlationImageWidth = width1 + width2
+  const correlationImageHeight = height1 + height2
+  const correlationImageSize = correlationImageWidth * correlationImageHeight
+  const correlationImageData = new Uint8ClampedArray(correlationImageSize)
+
+  for (let j = 0; j < correlationImageHeight; j++) {
+    for (let i = 0; i < correlationImageWidth; i++) {
+      const { sum, maxPossibleSum } = getSumOfMultiplications(
+        data1Grayscale,
+        width1,
+        height1,
+        data2Grayscale,
+        width2,
+        height2,
+        i,
+        j,
+      )
+      if (isNaN(sum)) throw new Error('NaN')
+
+      correlationImageData[j * correlationImageWidth + i] = 255 * sum / maxPossibleSum
+    }
+  }
+
+  console.log('correlationImageData', correlationImageData)
+
+  const coloredData = convertToColor(correlationImageData)
+
+  return new ImageData(coloredData, correlationImageWidth, correlationImageHeight)
+}
+
+function getSumOfMultiplications(
+  data1: Uint8ClampedArray,
+  width1: number,
+  height1: number,
+  data2: Uint8ClampedArray,
+  width2: number,
+  height2: number,
+  x: number,
+  y: number,
+): {
+  sum: number
+  maxPossibleSum: number
+} {
+  const x0Data1 = Math.max(0, x - width2)
+  const x1Data1 = Math.min(width1, x)
+  const x0Data2 = Math.max(0, width2 - x)
+  //const x1Data2 = Math.min(width2, width1 + width2 - x)
+
+  const y0Data1 = Math.max(0, y - height2)
+  const y1Data1 = Math.min(height1, y)
+  const y0Data2 = Math.max(0, height2 - y)
+  //const y1Data2 = Math.min(height2, height1 + height2 - y)
+
+  const windowWidth = x1Data1 - x0Data1
+  const windowHeight = y1Data1 - y0Data1
+
+  let sum = 0
+  let maxPossibleSum = 0
+  for (let i = 0; i < windowWidth; i++) {
+    for (let j = 0; j < windowHeight; j++) {
+      const data1Index = (y0Data1 + j) * width1 + x0Data1 + i
+      const data2Index = (y0Data2 + j) * width2 + x0Data2 + i
+
+      const data1Value = data1[data1Index]
+      const data2Value = data2[data2Index]
+
+      sum += data1Value * data2Value
+      maxPossibleSum += data2Value * 255
+    }
+  }
+
+  return {
+    sum,
+    maxPossibleSum,
+  }
 }

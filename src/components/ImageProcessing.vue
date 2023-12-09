@@ -54,7 +54,7 @@ import { ref, computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import { debounce } from 'advanced-throttle-debounce'
 
-const imageUrl = ref('https://mir-s3-cdn-cf.behance.net/project_modules/2800_opt_1/58f60527666431.56368c2348eca.jpg')
+const imageUrl = ref('/apples_small.png')
 
 const selectedProcessorId: Ref<string> = ref(
   processors[Object.keys(processors)[Object.keys(processors).length - 1]].id,
