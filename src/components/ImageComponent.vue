@@ -7,7 +7,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { processImageOntoCanvas, drawImageOnCanvas } from '@/controllers/images'
+import { processImageOntoCanvas, drawImageOnCanvas, getImage } from '@/controllers/images'
 import type { ImageProcessor, ProcessorOptions } from '@/controllers/imageProcessors'
 
 const props = defineProps<{
@@ -19,27 +19,23 @@ const props = defineProps<{
 const canvas = ref<HTMLCanvasElement | null>(null)
 
 onMounted(() => {
-  if (!canvas.value) throw new Error('Canvas not found')
-
-  const img = new Image()
-  img.crossOrigin = 'anonymous'
-
-  img.onload = () => {
+  getImage(props.imagePath).then(async (img) => {
     if (!canvas.value) throw new Error('Canvas not found')
 
     if (props.imageProcessor) {
       const startTimestamp = performance.now()
       const notification = pushNotify.promise('Processing image...')
-      processImageOntoCanvas(canvas.value, img, props.imageProcessor, props.processorOptions)
+      await processImageOntoCanvas(canvas.value, img, props.imageProcessor, props.processorOptions)
+      const timeTook = Math.round(performance.now() - startTimestamp)
+      console.log(`Correlation computed in ${timeTook}ms`)
       notification.resolve({
-        message: `Image processed in ${Math.round(performance.now() - startTimestamp)}ms`,
+        message: `Image processed in ${timeTook}ms`,
         duration: 1000,
       })
     } else {
       drawImageOnCanvas(canvas.value, img)
     }
-  }
+  })
 
-  img.src = props.imagePath
 })
 </script>

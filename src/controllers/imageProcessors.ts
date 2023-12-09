@@ -262,7 +262,6 @@ function sobelOperator(
   data: Uint8ClampedArray,
   width: number,
   height: number,
-  options: ProcessorOptions,
 ): Uint8ClampedArray {
   const newData = new Uint8ClampedArray(data.length)
 
@@ -404,7 +403,7 @@ function getWindow(
   return res
 }
 
-function getWindowAroundPixel(
+export function getWindowAroundPixel(
   x: number,
   y: number,
   data: Uint8ClampedArray,
