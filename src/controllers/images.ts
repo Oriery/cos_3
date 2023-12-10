@@ -30,7 +30,7 @@ export async function drawImageDataOnCanvas(canvas: HTMLCanvasElement, imageData
   if (!ctx) throw new Error('Could not get canvas context')
 
   const bitmap = await createImageBitmap(imageData)
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  ctx.drawImage(bitmap, 0, 0)
 }
 
 export async function drawDataOnCanvas(
@@ -39,11 +39,7 @@ export async function drawDataOnCanvas(
   width: number,
   height: number,
 ) {
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Could not get canvas context')
-
-  const bitmap = await createImageBitmap(new ImageData(data, width, height))
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  drawImageDataOnCanvas(canvas, new ImageData(data, width, height))
 }
 
 function getProcessedImageCopyUsingGivenFn(
@@ -65,9 +61,9 @@ export function drawImageOnCanvas(canvas: HTMLCanvasElement, img: HTMLImageEleme
   if (!ctx) throw new Error('Could not get canvas context')
 
   const ratio = img.width / img.height
-  canvas.height = canvas.width / ratio
+  // canvas.height = canvas.width / ratio
 
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+  ctx.drawImage(img, 0, 0)
 }
 
 export async function drawCorrelationOf2ImagesOnCanvas(
@@ -85,23 +81,22 @@ export async function drawCorrelationOf2ImagesOnCanvas(
   console.log('img1 width height', img1.width, img1.height)
   console.log('img2 width height', img2.width, img2.height)
 
-  const ratio = img1.width / img1.height
-  canvas.height = canvas.width / ratio
+  const imgData1 = getImageDataOfImage(img1)
+  const imgData2 = getImageDataOfImage(img2)
 
-  const correlationImageData = getCorrelationData(
-    getDataOfImage(img1),
-    img1.width,
-    img1.height,
-    getDataOfImage(img2),
-    img2.width,
-    img2.height,
-  )
+  canvas.height = 400
+
+  const correlationImageData = getCorrelationData(imgData1, imgData2)
 
   console.log('correlationImageData', correlationImageData)
 
-  drawImageDataOnCanvas(canvas, correlationImageData)
+  drawImageDataOnCanvas(canvas, correlationImageData.corrMap)
 
-  return correlationImageData
+  return {
+    correlationImageData,
+    imgData1,
+    imgData2,
+  }
 }
 
 export function getImage(url: string): Promise<HTMLImageElement> {
@@ -122,7 +117,7 @@ export function getDataOfImage(img: HTMLImageElement): Uint8ClampedArray {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get canvas context')
 
-  ctx.drawImage(img, 0, 0, img.width, img.height)
+  ctx.drawImage(img, 0, 0)
 
   const imageData = ctx.getImageData(0, 0, img.width, img.height)
 
@@ -175,16 +170,16 @@ export function convertToColor(data: Uint8ClampedArray): Uint8ClampedArray {
   return newData
 }
 
-function getCorrelationData(
-  data1: Uint8ClampedArray,
-  width1: number,
-  height1: number,
-  data2: Uint8ClampedArray,
-  width2: number,
-  height2: number,
-): ImageData {
-  let data1Grayscale = convertToGrayscale(data1)
-  let data2Grayscale = convertToGrayscale(data2)
+function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
+  corrMap: ImageData
+  max: {
+    value: number
+    x: number
+    y: number
+  }
+} {
+  let data1Grayscale = convertToGrayscale(imgData1.data)
+  let data2Grayscale = convertToGrayscale(imgData2.data)
 
   // sort the data by size
   if (data1Grayscale.length < data2Grayscale.length) {
@@ -193,26 +188,45 @@ function getCorrelationData(
     data2Grayscale = tmp
   }
 
-  const correlationImageWidth = width1 + width2
-  const correlationImageHeight = height1 + height2
+  const correlationImageWidth = imgData1.width + imgData2.width
+  const correlationImageHeight = imgData1.height + imgData2.height
   const correlationImageSize = correlationImageWidth * correlationImageHeight
   const correlationImageData = new Uint8ClampedArray(correlationImageSize)
 
+  const max = {
+    value: Infinity,
+    //value: 0,
+    x: 0,
+    y: 0,
+  }
+
   for (let j = 0; j < correlationImageHeight; j++) {
     for (let i = 0; i < correlationImageWidth; i++) {
-      const { sum, maxPossibleSum } = getSumOfMultiplications(
+      const { sum, overlapArea } = getSumOfMultiplications(
         data1Grayscale,
-        width1,
-        height1,
+        imgData1.width,
+        imgData1.height,
         data2Grayscale,
-        width2,
-        height2,
+        imgData2.width,
+        imgData2.height,
         i,
         j,
       )
       if (isNaN(sum)) throw new Error('NaN')
 
-      correlationImageData[j * correlationImageWidth + i] = 255 * sum / maxPossibleSum
+      //const val = (255 * sum) / 40000000
+      //const val = 255 - (255 * sum) / 20 / overlapArea
+      const val = 255 - (255 * sum) / 40000
+      correlationImageData[j * correlationImageWidth + i] = val
+
+      if (i > imgData2.width && j > imgData2.height && i < imgData1.width && j < imgData1.height) {
+        if (overlapArea !== 2000) console.log('overlapArea', overlapArea)
+        if (sum < max.value) {
+          max.value = sum
+          max.x = i
+          max.y = j
+        }
+      }
     }
   }
 
@@ -220,7 +234,10 @@ function getCorrelationData(
 
   const coloredData = convertToColor(correlationImageData)
 
-  return new ImageData(coloredData, correlationImageWidth, correlationImageHeight)
+  return {
+    corrMap: new ImageData(coloredData, correlationImageWidth, correlationImageHeight),
+    max,
+  }
 }
 
 function getSumOfMultiplications(
@@ -232,10 +249,7 @@ function getSumOfMultiplications(
   height2: number,
   x: number,
   y: number,
-): {
-  sum: number
-  maxPossibleSum: number
-} {
+) {
   const x0Data1 = Math.max(0, x - width2)
   const x1Data1 = Math.min(width1, x)
   const x0Data2 = Math.max(0, width2 - x)
@@ -250,7 +264,6 @@ function getSumOfMultiplications(
   const windowHeight = y1Data1 - y0Data1
 
   let sum = 0
-  let maxPossibleSum = 0
   for (let i = 0; i < windowWidth; i++) {
     for (let j = 0; j < windowHeight; j++) {
       const data1Index = (y0Data1 + j) * width1 + x0Data1 + i
@@ -259,13 +272,14 @@ function getSumOfMultiplications(
       const data1Value = data1[data1Index]
       const data2Value = data2[data2Index]
 
-      sum += data1Value * data2Value
-      maxPossibleSum += data2Value * 255
+      //sum += (data1Value - data2Value) ** 2
+      //sum += data1Value * data2Value
+      sum += Math.abs(data1Value - data2Value)
     }
   }
 
   return {
     sum,
-    maxPossibleSum,
+    overlapArea: windowWidth * windowHeight,
   }
 }

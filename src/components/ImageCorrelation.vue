@@ -38,7 +38,7 @@
           class="w-full"
         ></canvas>
         <canvas
-          ref="canvasImage"
+          ref="canvasImg1OnCorrelation"
           :style="canvasIsVisible ? '' : 'visibility: hidden'"
           class="w-full"
         ></canvas>
@@ -68,6 +68,7 @@ const canvasIsVisible = ref(false)
 
 const canvasImage1Grayscale = ref<HTMLCanvasElement | null>(null)
 const canvasImage2Grayscale = ref<HTMLCanvasElement | null>(null)
+const canvasImg1OnCorrelation = ref<HTMLCanvasElement | null>(null)
 
 onMounted(updateCorrelationImage)
 
@@ -81,7 +82,7 @@ async function updateCorrelationImage() {
   const startTimestamp = performance.now()
   const notification = pushNotify.promise('Processing image...')
   try {
-    const correlationImage = await drawCorrelationOf2ImagesOnCanvas(
+    const correlation = await drawCorrelationOf2ImagesOnCanvas(
       canvas.value,
       image1Url.value,
       image2Url.value,
@@ -93,6 +94,8 @@ async function updateCorrelationImage() {
       duration: 1000,
     })
     canvasIsVisible.value = true
+
+    updateImg1OnCorrelation(correlation)
   } catch (err) {
     notification.clear()
     canvasIsVisible.value = false
@@ -124,4 +127,31 @@ async function updateGrayscaleImages() {
   drawImageDataOnCanvas(canvasImage1Grayscale.value, grayscaleImageData1)
   drawImageDataOnCanvas(canvasImage2Grayscale.value, grayscaleImageData2)
 }
+
+async function updateImg1OnCorrelation(correlation: Awaited<ReturnType<typeof drawCorrelationOf2ImagesOnCanvas>>) {
+  if (!canvasImg1OnCorrelation.value) throw new Error('Canvas not found')
+  const ctx = canvasImg1OnCorrelation.value.getContext('2d')
+  if (!ctx) throw new Error('Could not get canvas context')
+
+  const { correlationImageData, imgData1, imgData2 } = correlation
+
+  canvasImg1OnCorrelation.value.height = 400
+  ctx.strokeStyle = 'red'
+  ctx.lineWidth = 2
+  const bitmap1 = await createImageBitmap(imgData1)
+  ctx.drawImage(
+    bitmap1,
+    0,
+    0,
+    imgData1.width,
+    imgData1.height,
+    imgData2.width,
+    imgData2.height,
+    imgData1.width,
+    imgData1.height,
+  )
+  ctx.strokeRect(correlationImageData.max.x, correlationImageData.max.y, imgData2.width, imgData2.height)
+}
+
+
 </script>
