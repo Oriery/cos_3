@@ -77,14 +77,16 @@ export async function drawCorrelationOf2ImagesOnCanvas(
   console.log('img1Url', img1Url)
   console.log('img2Url', img2Url)
 
+  const autoCorrelation = img1Url === img2Url
+
   const [img1, img2] = await Promise.all([getImage(img1Url), getImage(img2Url)])
   console.log('img1 width height', img1.width, img1.height)
   console.log('img2 width height', img2.width, img2.height)
 
   const imgData1 = getImageDataOfImage(img1)
-  const imgData2 = getImageDataOfImage(img2)
+  const imgData2 = autoCorrelation ? imgData1 : getImageDataOfImage(img2)
 
-  canvas.height = 400
+  canvas.height = 200
 
   const correlationImageData = getCorrelationData(imgData1, imgData2)
 
@@ -170,16 +172,22 @@ export function convertToColor(data: Uint8ClampedArray): Uint8ClampedArray {
   return newData
 }
 
-function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
-  corrMap: ImageData
-  max: {
-    value: number
+export type Maximums = {
+  value: number
+  coordinates: {
     x: number
     y: number
-  }
+  }[]
+}
+
+function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
+  corrMap: ImageData
+  max: Maximums
 } {
+  const autoCorrelation = imgData1 === imgData2
+
   let data1Grayscale = convertToGrayscale(imgData1.data)
-  let data2Grayscale = convertToGrayscale(imgData2.data)
+  let data2Grayscale = autoCorrelation ? data1Grayscale : convertToGrayscale(imgData2.data)
 
   // sort the data by size
   if (data1Grayscale.length < data2Grayscale.length) {
@@ -193,11 +201,9 @@ function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
   const correlationImageSize = correlationImageWidth * correlationImageHeight
   const correlationImageData = new Uint8ClampedArray(correlationImageSize)
 
-  const max = {
+  const max : Maximums = {
     value: Infinity,
-    //value: 0,
-    x: 0,
-    y: 0,
+    coordinates: [],
   }
 
   for (let j = 0; j < correlationImageHeight; j++) {
@@ -214,20 +220,38 @@ function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
       )
       if (isNaN(sum)) throw new Error('NaN')
 
-      //const val = (255 * sum) / 40000000
-      //const val = 255 - (255 * sum) / 20 / overlapArea
-      const val = 255 - (255 * sum) / 40000
-      correlationImageData[j * correlationImageWidth + i] = val
+      if (autoCorrelation) {
+        const checkedSum = sum / overlapArea
+        const val = 255 - checkedSum * 10
+        correlationImageData[j * correlationImageWidth + i] = val
 
-      if (i > imgData2.width && j > imgData2.height && i < imgData1.width && j < imgData1.height) {
-        if (overlapArea !== 2000) console.log('overlapArea', overlapArea)
-        if (sum < max.value) {
-          max.value = sum
-          max.x = i
-          max.y = j
+        if (checkedSum !== 0) {
+          if (roughlyEqualByPercentage(checkedSum, max.value, 0.7)) {
+            max.coordinates.push({ x: i, y: j })
+          } else if (checkedSum < max.value) {
+            max.value = checkedSum
+            max.coordinates = [{ x: i, y: j }]
+          }
+        }
+      } else {
+        const val = 255 - (255 * sum) / 40000
+        correlationImageData[j * correlationImageWidth + i] = val
+
+        if (i > imgData2.width && j > imgData2.height && i < imgData1.width && j < imgData1.height) {
+          if (sum < max.value) {
+            max.value = sum
+            max.coordinates = [{ x: i, y: j }]
+          } else if (sum === max.value) {
+            max.coordinates.push({ x: i, y: j })
+          }
         }
       }
     }
+  }
+
+  if (autoCorrelation) {
+    // push center point
+    max.coordinates.push({ x: imgData1.width, y: imgData1.height })
   }
 
   console.log('correlationImageData', correlationImageData)
@@ -238,6 +262,10 @@ function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
     corrMap: new ImageData(coloredData, correlationImageWidth, correlationImageHeight),
     max,
   }
+}
+
+function roughlyEqualByPercentage(a: number, b: number, percentage: number) {
+  return Math.abs(a - b) < percentage * Math.max(a, b)
 }
 
 function getSumOfMultiplications(
@@ -273,7 +301,7 @@ function getSumOfMultiplications(
       const data2Value = data2[data2Index]
 
       //sum += (data1Value - data2Value) ** 2
-      //sum += data1Value * data2Value
+      //sum -= data1Value * data2Value
       sum += Math.abs(data1Value - data2Value)
     }
   }
