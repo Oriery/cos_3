@@ -78,7 +78,7 @@ const roughEqualityInPixels = 4
 onMounted(updateCorrelationImage)
 
 const debouncedTriggerToUpdateProcessedImage = debounce(updateCorrelationImage, {
-  wait: 200,
+  wait: 500,
   differentArgs: false,
 })
 watch([image1Url, image2Url], debouncedTriggerToUpdateProcessedImage)

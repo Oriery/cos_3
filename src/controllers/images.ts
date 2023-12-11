@@ -231,11 +231,11 @@ function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
 
       if (autoCorrelation) {
         const checkedSum = sum / overlapArea
-        const val = 255 - checkedSum * 10
+        const val = 255 - checkedSum / 10
         correlationImageData[j * correlationImageWidth + i] = val
 
         if (checkedSum !== 0) {
-          if (roughlyEqualByPercentage(checkedSum, max.value, 0.7)) {
+          if (roughlyEqualByPercentage(checkedSum, max.value, 0.8)) {
             max.coordinates.push({ x: i, y: j })
           } else if (checkedSum < max.value) {
             max.value = checkedSum
@@ -243,7 +243,7 @@ function getCorrelationData(imgData1: ImageData, imgData2: ImageData): {
           }
         }
       } else {
-        const val = 255 - (255 * sum) / 40000
+        const val = 255 - (255 * sum) / 4000000
         correlationImageData[j * correlationImageWidth + i] = val
 
         if (i > imgData2.width && j > imgData2.height && i < imgData1.width && j < imgData1.height) {
@@ -309,9 +309,9 @@ function getSumOfMultiplications(
       const data1Value = data1[data1Index]
       const data2Value = data2[data2Index]
 
-      //sum += (data1Value - data2Value) ** 2
+      sum += (data1Value - data2Value) ** 2
       //sum -= data1Value * data2Value
-      sum += Math.abs(data1Value - data2Value)
+      //sum += Math.abs(data1Value - data2Value)
     }
   }
 
