@@ -4,9 +4,16 @@
       <v-text-field
         v-model="image1Url"
         label="Image 1 URL"
+        @keyup.enter="randomizeSecondImage"
       />
+      <v-switch
+        v-model="secondImageIsARandomPartOfFirstImage"
+        label="Img 2 is a random part of img 1"
+        :color="secondImageIsARandomPartOfFirstImage ? 'blue' : 'grey'"
+      ></v-switch>
       <v-text-field
-        v-model="image2Url"
+        v-if="!secondImageIsARandomPartOfFirstImage"
+        v-model="image2UrlTemp"
         label="Image 2 URL"
       />
     </div>
@@ -59,11 +66,32 @@ import {
 } from '@/controllers/images'
 import { debounce } from 'advanced-throttle-debounce'
 
+const secondImageIsARandomPartOfFirstImage = ref(false)
 const image1Url = ref(localStorage.getItem('image1Url') ?? '/apples_100.png')
-const image2Url = ref(localStorage.getItem('image2Url') ?? '/apples_100_part.png')
+const image2UrlTemp = ref(localStorage.getItem('image2Url') ?? '/apples_100_part.png')
+const urlOfRandomPartOfImg1 = ref('')
+const image2UrlPromise = computed(() => {
+  return secondImageIsARandomPartOfFirstImage.value
+  ? urlOfRandomPartOfImg1.value
+  : image2UrlTemp.value
+})
+
+const image2Url = ref(image2UrlTemp)
+watch(image2UrlPromise, async (urlPromise) => {
+  image2Url.value = await urlPromise
+})
+async function randomizeSecondImage() {
+  urlOfRandomPartOfImg1.value = await getUrlOfRandomPartOfImg(image1Url.value)
+}
+
 const autoCorrelation = computed(() => image1Url.value === image2Url.value)
 
-watch(image1Url, (url) => localStorage.setItem('image1Url', url))
+watch(image1Url, async (url) => {
+  localStorage.setItem('image1Url', url)
+  if (secondImageIsARandomPartOfFirstImage.value) {
+    urlOfRandomPartOfImg1.value = await getUrlOfRandomPartOfImg(url)
+  }
+})
 watch(image2Url, (url) => localStorage.setItem('image2Url', url))
 
 const canvas = ref<HTMLCanvasElement | null>(null)
@@ -75,7 +103,10 @@ const canvasImg1OnCorrelation = ref<HTMLCanvasElement | null>(null)
 
 const roughEqualityInPixels = 4
 
-onMounted(updateCorrelationImage)
+onMounted(() => {
+  updateCorrelationImage()
+  randomizeSecondImage()
+})
 
 const debouncedTriggerToUpdateProcessedImage = debounce(updateCorrelationImage, {
   wait: 500,
@@ -269,7 +300,9 @@ async function updateImg1OnCorrelationAuto(
   console.log(mostCommonDelta)
 
   // merge similar deltas
-  const groupesByXInPattern = xYAndDeltaX.filter(({ delta }) => roughlyEqual(delta, mostCommonDelta, roughEqualityInPixels))
+  const groupesByXInPattern = xYAndDeltaX.filter(({ delta }) =>
+    roughlyEqual(delta, mostCommonDelta, roughEqualityInPixels),
+  )
   console.log('groupesByXInPattern', groupesByXInPattern)
 
   const leftColumnIndex = 0
@@ -292,7 +325,7 @@ async function updateImg1OnCorrelationAuto(
   ctx.lineTo(pointRight1.x, pointRight1.y)
   ctx.closePath()
   ctx.stroke()
-  
+
   ctx.strokeStyle = 'blue'
   ctx.beginPath()
   ctx.moveTo(pointLeft1.x + imgData2.width, pointLeft1.y + imgData2.height)
@@ -324,5 +357,34 @@ function roughlyEqualByPercentage(a: number, b: number, percentage: number) {
 
 function roughlyEqual(a: number, b: number, delta: number) {
   return Math.abs(a - b) <= delta
+}
+
+async function getUrlOfRandomPartOfImg(img1Url: string) {
+  const img1 = await getImage(img1Url)
+  const imgData1 = getImageDataOfImage(img1)
+
+  const maxRandomWidth = imgData1.width / 2
+  const maxRandomHeight = imgData1.height / 2
+  const minRandomWidth = imgData1.width / 8
+  const minRandomHeight = imgData1.height / 8
+
+  const randomWidth = Math.floor(Math.random() * (maxRandomWidth - minRandomWidth) + minRandomWidth)
+  const randomHeight = Math.floor(
+    Math.random() * (maxRandomHeight - minRandomHeight) + minRandomHeight,
+  )
+
+  const randomX = Math.floor(Math.random() * (imgData1.width - randomWidth))
+  const randomY = Math.floor(Math.random() * (imgData1.height - randomHeight))
+
+  const canvas = document.createElement('canvas')
+  canvas.width = randomWidth
+  canvas.height = randomHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not get canvas context')
+
+  ctx.drawImage(img1, randomX, randomY, randomWidth, randomHeight, 0, 0, randomWidth, randomHeight)
+
+  const url = canvas.toDataURL()
+  return url
 }
 </script>
