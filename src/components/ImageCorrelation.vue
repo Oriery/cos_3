@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import ImageComponent from '@/components/ImageComponent.vue'
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { onMounted } from 'vue'
 import {
   drawCorrelationOf2ImagesOnCanvas,
@@ -59,8 +59,12 @@ import {
 } from '@/controllers/images'
 import { debounce } from 'advanced-throttle-debounce'
 
-const image1Url = ref('/pattern_100.png')
-const image2Url = ref('/pattern_100.png')
+const image1Url = ref(localStorage.getItem('image1Url') ?? '/apples_100.png')
+const image2Url = ref(localStorage.getItem('image2Url') ?? '/apples_100_part.png')
+const autoCorrelation = computed(() => image1Url.value === image2Url.value)
+
+watch(image1Url, (url) => localStorage.setItem('image1Url', url))
+watch(image2Url, (url) => localStorage.setItem('image2Url', url))
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const canvasIsVisible = ref(false)
@@ -100,7 +104,11 @@ async function updateCorrelationImage() {
     })
     canvasIsVisible.value = true
 
-    updateImg1OnCorrelation(correlation)
+    if (autoCorrelation.value) {
+      updateImg1OnCorrelationAuto(correlation)
+    } else {
+      updateImg1OnCorrelationCross(correlation)
+    }
   } catch (err) {
     notification.clear()
     canvasIsVisible.value = false
@@ -133,7 +141,7 @@ async function updateGrayscaleImages() {
   drawImageDataOnCanvas(canvasImage2Grayscale.value, grayscaleImageData2)
 }
 
-async function updateImg1OnCorrelation(
+async function updateImg1OnCorrelationCross(
   correlation: Awaited<ReturnType<typeof drawCorrelationOf2ImagesOnCanvas>>,
 ) {
   if (!canvasImg1OnCorrelation.value) throw new Error('Canvas not found')
@@ -142,7 +150,7 @@ async function updateImg1OnCorrelation(
 
   const { correlationImageData, imgData1, imgData2 } = correlation
 
-  canvasImg1OnCorrelation.value.height = 200
+  canvasImg1OnCorrelation.value.height = canvas.value?.height ?? 0
 
   const bitmap1 = await createImageBitmap(imgData1)
   ctx.drawImage(
@@ -157,9 +165,39 @@ async function updateImg1OnCorrelation(
     imgData1.height,
   )
 
-  ctx.strokeStyle = 'white'
+  ctx.strokeStyle = 'red'
   ctx.lineWidth = 1
-  ctx.strokeRect(1, 1, imgData1.width + imgData2.width, imgData1.height + imgData2.height)
+
+  const coord = correlationImageData.max.coordinates[0]
+  ctx.strokeRect(coord.x, coord.y, imgData2.width, imgData2.height)
+}
+
+async function updateImg1OnCorrelationAuto(
+  correlation: Awaited<ReturnType<typeof drawCorrelationOf2ImagesOnCanvas>>,
+) {
+  if (!canvasImg1OnCorrelation.value) throw new Error('Canvas not found')
+  const ctx = canvasImg1OnCorrelation.value.getContext('2d')
+  if (!ctx) throw new Error('Could not get canvas context')
+
+  const { correlationImageData, imgData1, imgData2 } = correlation
+
+  canvasImg1OnCorrelation.value.height = canvas.value?.height ?? 0
+
+  ctx.fillStyle = 'black'
+  ctx.fillRect(0, 0, correlationImageData.corrMap.width, correlationImageData.corrMap.height)
+
+  const bitmap1 = await createImageBitmap(imgData1)
+  ctx.drawImage(
+    bitmap1,
+    0,
+    0,
+    imgData1.width,
+    imgData1.height,
+    imgData2.width,
+    imgData2.height,
+    imgData1.width,
+    imgData1.height,
+  )
 
   ctx.strokeStyle = 'red'
   console.log(correlationImageData.max)

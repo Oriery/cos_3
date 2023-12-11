@@ -25,9 +25,18 @@ export async function processImageOntoCanvas(
   }
 }
 
+export function clearCanvas(canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Could not get canvas context')
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+}
+
 export async function drawImageDataOnCanvas(canvas: HTMLCanvasElement, imageData: ImageData) {
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('Could not get canvas context')
+
+  clearCanvas(canvas)
 
   const bitmap = await createImageBitmap(imageData)
   ctx.drawImage(bitmap, 0, 0)
@@ -86,7 +95,7 @@ export async function drawCorrelationOf2ImagesOnCanvas(
   const imgData1 = getImageDataOfImage(img1)
   const imgData2 = autoCorrelation ? imgData1 : getImageDataOfImage(img2)
 
-  canvas.height = 200
+  canvas.height = imgData1.height + imgData2.height
 
   const correlationImageData = getCorrelationData(imgData1, imgData2)
 

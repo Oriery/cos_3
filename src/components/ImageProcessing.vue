@@ -54,7 +54,11 @@ import { ref, computed, watch } from 'vue'
 import type { Ref } from 'vue'
 import { debounce } from 'advanced-throttle-debounce'
 
-const imageUrl = ref('/apples_100.png')
+const imageUrl = ref(localStorage.getItem('imageUrl') ?? '/apples_100.png')
+
+watch(imageUrl, (newImageUrl) => {
+  localStorage.setItem('imageUrl', newImageUrl)
+})
 
 const selectedProcessorId: Ref<string> = ref(
   processors[Object.keys(processors)[Object.keys(processors).length - 1]].id,
