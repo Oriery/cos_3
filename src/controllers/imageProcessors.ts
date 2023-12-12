@@ -76,6 +76,14 @@ export const processors: Record<string, ImageProcessor> = {
     fn: sharpeningFilter,
     options: [
       {
+        id: 'threshold',
+        name: 'Threshold',
+        defaultValue: 180,
+        min: 0,
+        max: 255,
+        step: 1,
+      },
+      {
         id: 'amount',
         name: 'Amount',
         defaultValue: 3,
@@ -92,13 +100,13 @@ export const processors: Record<string, ImageProcessor> = {
         step: 1,
       },
       {
-        id: 'threshold',
-        name: 'Threshold',
-        defaultValue: 180,
+        id: 'showStep',
+        name: 'Show step',
+        defaultValue: 4,
         min: 0,
-        max: 255,
+        max: 4,
         step: 1,
-      },
+      }
     ],
   },
 }
@@ -367,10 +375,20 @@ function sharpeningFilter(
 ): Uint8ClampedArray {
   checkThatAllOptionsAreProvidedAndValid(options, processors.sharpeningFilter)
 
+  if (options.showStep === 0) {
+    // show original image
+    return data
+  }
+
   const newData = new Uint8ClampedArray(data.length)
 
   // get sobel map
   const sobelMap = sobelOperator(data, width, height)
+
+  if (options.showStep === 1) {
+    // show sobel map
+    return sobelMap
+  }
 
   // determine what to consider as edge
   const isEdgeMap = new Uint8ClampedArray(sobelMap.length)
@@ -387,15 +405,29 @@ function sharpeningFilter(
     isEdgeMap[i + 3] = a
   }
 
+  if (options.showStep === 2) {
+    // show isEdgeMap
+    return isEdgeMap
+  }
+
   const gaussKernel = getGaussianKernel(options.radius)
 
   for (let i = 0; i < isEdgeMap.length; i += 4) {
     if (isEdgeMap[i] == 0) {
       // not an edge
-      newData[i] = data[i]
-      newData[i + 1] = data[i + 1]
-      newData[i + 2] = data[i + 2]
-      newData[i + 3] = data[i + 3]
+
+      if (options.showStep === 3) {
+        // show raw difference of sharpenning (only in edges)
+        newData[i] = 0
+        newData[i + 1] = 0
+        newData[i + 2] = 0
+        newData[i + 3] = data[i + 3]
+      } else {
+        newData[i] = data[i]
+        newData[i + 1] = data[i + 1]
+        newData[i + 2] = data[i + 2]
+        newData[i + 3] = data[i + 3]
+      }
     } else {
       // edge
       const blurredValues = getGaussianBlurForOnePixel(
@@ -407,18 +439,19 @@ function sharpeningFilter(
         options.radius,
         gaussKernel,
       )
-      
-      newData[i] = blurredValues[0] + options.amount * (data[i] - blurredValues[0])
-      newData[i + 1] = blurredValues[1] + options.amount * (data[i + 1] - blurredValues[1])
-      newData[i + 2] = blurredValues[2] + options.amount * (data[i + 2] - blurredValues[2])
-      newData[i + 3] = data[i + 3]
-    
-      /* for debug to only show raw difference of sharpenning
-      newData[i] = (data[i] - blurredValues[0]) * options.amount
-      newData[i + 1] = (data[i + 1] - blurredValues[1]) * options.amount
-      newData[i + 2] = (data[i + 2] - blurredValues[2]) * options.amount
-      newData[i + 3] = data[i + 3] * options.amount
-      */
+
+      if (options.showStep === 3) {
+        // show raw difference of sharpenning (only in edges)
+        newData[i] = (data[i] - blurredValues[0]) * options.amount
+        newData[i + 1] = (data[i + 1] - blurredValues[1]) * options.amount
+        newData[i + 2] = (data[i + 2] - blurredValues[2]) * options.amount
+        newData[i + 3] = data[i + 3]
+      } else {
+        newData[i] = blurredValues[0] + options.amount * (data[i] - blurredValues[0])
+        newData[i + 1] = blurredValues[1] + options.amount * (data[i + 1] - blurredValues[1])
+        newData[i + 2] = blurredValues[2] + options.amount * (data[i + 2] - blurredValues[2])
+        newData[i + 3] = data[i + 3]
+      }
     }
   }
 
