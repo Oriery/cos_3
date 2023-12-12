@@ -47,14 +47,6 @@ export const processors: Record<string, ImageProcessor> = {
         max: 20,
         step: 1,
       },
-      {
-        id: 'stdDeviation',
-        name: String.fromCharCode(0x03c3),
-        defaultValue: 3,
-        min: 0.5,
-        max: 10,
-        step: 0.5,
-      },
     ],
   },
   medianFilter: {
@@ -77,6 +69,37 @@ export const processors: Record<string, ImageProcessor> = {
     name: 'Sobel Operator',
     fn: sobelOperator,
     options: [],
+  },
+  sharpeningFilter: {
+    id: 'sharpeningFilter',
+    name: 'Sharpening',
+    fn: sharpeningFilter,
+    options: [
+      {
+        id: 'amount',
+        name: 'Amount',
+        defaultValue: 3,
+        min: 0,
+        max: 10,
+        step: 0.2,
+      },
+      {
+        id: 'radius',
+        name: 'Radius',
+        defaultValue: 3,
+        min: 1,
+        max: 10,
+        step: 1,
+      },
+      {
+        id: 'threshold',
+        name: 'Threshold',
+        defaultValue: 180,
+        min: 0,
+        max: 255,
+        step: 1,
+      },
+    ],
   },
 }
 
@@ -149,23 +172,20 @@ function gaussianBlur(
 
   const newData = new Uint8ClampedArray(data.length)
 
-  const kernel = getGaussianKernel(options.radius, options.stdDeviation)
+  const kernel = getGaussianKernel(options.radius)
 
   for (let y = 0; y < height; y++) {
     const y1 = y * width
     for (let x = 0; x < width; x++) {
-      const neighbors = getWindowAroundPixel(x, y, data, width, height, options.radius)
-
-      let rSum = 0
-      let gSum = 0
-      let bSum = 0
-      let aSum = 0
-      for (let i = 0; i < neighbors.length; i += 4) {
-        rSum += neighbors[i] * kernel[i / 4]
-        gSum += neighbors[i + 1] * kernel[i / 4]
-        bSum += neighbors[i + 2] * kernel[i / 4]
-        aSum += neighbors[i + 3] * kernel[i / 4]
-      }
+      const [rSum, gSum, bSum, aSum] = getGaussianBlurForOnePixel(
+        x,
+        y,
+        data,
+        width,
+        height,
+        options.radius,
+        kernel,
+      )
 
       newData[4 * (y1 + x)] = rSum
       newData[4 * (y1 + x) + 1] = gSum
@@ -177,7 +197,33 @@ function gaussianBlur(
   return newData
 }
 
-function getGaussianKernel(radius: number, stdDeviation: number): number[] {
+function getGaussianBlurForOnePixel (
+  x: number,
+  y: number,
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  radius: number,
+  kernel: number[],
+): number[] {
+  const neighbors = getWindowAroundPixel(x, y, data, width, height, radius)
+
+  let rSum = 0
+  let gSum = 0
+  let bSum = 0
+  let aSum = 0
+  for (let i = 0; i < neighbors.length; i += 4) {
+    rSum += neighbors[i] * kernel[i / 4]
+    gSum += neighbors[i + 1] * kernel[i / 4]
+    bSum += neighbors[i + 2] * kernel[i / 4]
+    aSum += neighbors[i + 3] * kernel[i / 4]
+  }
+
+  return [rSum, gSum, bSum, aSum]
+}
+
+function getGaussianKernel(radius: number): number[] {
+  const stdDeviation = radius / 3
   const kernelSize = 2 * radius + 1
   const kernel = new Array(kernelSize * kernelSize)
 
@@ -258,11 +304,7 @@ function getMedian(data: Uint8ClampedArray, channel: number): number {
   return window[Math.floor(window.length / 2)]
 }
 
-function sobelOperator(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-): Uint8ClampedArray {
+function sobelOperator(data: Uint8ClampedArray, width: number, height: number): Uint8ClampedArray {
   const newData = new Uint8ClampedArray(data.length)
 
   const kernelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1]
@@ -315,6 +357,72 @@ function convolve(data: Uint8ClampedArray, kernel: number[], channel: number): n
   }
 
   return sum
+}
+
+function sharpeningFilter(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: ProcessorOptions,
+): Uint8ClampedArray {
+  checkThatAllOptionsAreProvidedAndValid(options, processors.sharpeningFilter)
+
+  const newData = new Uint8ClampedArray(data.length)
+
+  // get sobel map
+  const sobelMap = sobelOperator(data, width, height)
+
+  // determine what to consider as edge
+  const isEdgeMap = new Uint8ClampedArray(sobelMap.length)
+  for (let i = 0; i < sobelMap.length; i += 4) {
+    const r = sobelMap[i]
+    const g = sobelMap[i + 1]
+    const b = sobelMap[i + 2]
+    const a = sobelMap[i + 3]
+
+    const isEdge = r + g + b > 3 * options.threshold
+    isEdgeMap[i] = isEdge ? 255 : 0
+    isEdgeMap[i + 1] = isEdge ? 255 : 0
+    isEdgeMap[i + 2] = isEdge ? 255 : 0
+    isEdgeMap[i + 3] = a
+  }
+
+  const gaussKernel = getGaussianKernel(options.radius)
+
+  for (let i = 0; i < isEdgeMap.length; i += 4) {
+    if (isEdgeMap[i] == 0) {
+      // not an edge
+      newData[i] = data[i]
+      newData[i + 1] = data[i + 1]
+      newData[i + 2] = data[i + 2]
+      newData[i + 3] = data[i + 3]
+    } else {
+      // edge
+      const blurredValues = getGaussianBlurForOnePixel(
+        i / 4 % width,
+        Math.floor(i / 4 / width),
+        data,
+        width,
+        height,
+        options.radius,
+        gaussKernel,
+      )
+      
+      newData[i] = blurredValues[0] + options.amount * (data[i] - blurredValues[0])
+      newData[i + 1] = blurredValues[1] + options.amount * (data[i + 1] - blurredValues[1])
+      newData[i + 2] = blurredValues[2] + options.amount * (data[i + 2] - blurredValues[2])
+      newData[i + 3] = data[i + 3]
+    
+      /* for debug to only show raw difference of sharpenning
+      newData[i] = (data[i] - blurredValues[0]) * options.amount
+      newData[i + 1] = (data[i + 1] - blurredValues[1]) * options.amount
+      newData[i + 2] = (data[i + 2] - blurredValues[2]) * options.amount
+      newData[i + 3] = data[i + 3] * options.amount
+      */
+    }
+  }
+
+  return newData
 }
 
 function checkThatAllOptionsAreProvidedAndValid(
@@ -397,7 +505,9 @@ function getWindow(
   }
 
   if (i != outLength) {
-    throw new Error(`i (${i}) != outLength (${outLength}). Parameters:\nxFrom=${xFrom},\nyFrom=${yFrom},\nxTo=${xTo},\nyTo=${yTo},\nwidth=${width},\nnumberOfChannels=${numberOfChannels},\nleftEdgeDuplicates=${leftEdgeDuplicates},\nrightEdgeDuplicates=${rightEdgeDuplicates},\ntopEdgeDuplicates=${topEdgeDuplicates},\nbottomEdgeDuplicates=${bottomEdgeDuplicates}`)
+    throw new Error(
+      `i (${i}) != outLength (${outLength}). Parameters:\nxFrom=${xFrom},\nyFrom=${yFrom},\nxTo=${xTo},\nyTo=${yTo},\nwidth=${width},\nnumberOfChannels=${numberOfChannels},\nleftEdgeDuplicates=${leftEdgeDuplicates},\nrightEdgeDuplicates=${rightEdgeDuplicates},\ntopEdgeDuplicates=${topEdgeDuplicates},\nbottomEdgeDuplicates=${bottomEdgeDuplicates}`,
+    )
   }
 
   return res
