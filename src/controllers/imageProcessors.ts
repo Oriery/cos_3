@@ -109,6 +109,21 @@ export const processors: Record<string, ImageProcessor> = {
       }
     ],
   },
+  posterizeFilter: {
+    id: 'posterizeFilter',
+    name: 'Posterize',
+    fn: posterizeFilter,
+    options: [
+      {
+        id: 'levels',
+        name: 'Levels',
+        defaultValue: 2,
+        min: 2,
+        max: 16,
+        step: 1,
+      },
+    ],
+  },
 }
 
 export type ProcessorOptionDescr = {
@@ -453,6 +468,38 @@ function sharpeningFilter(
         newData[i + 3] = data[i + 3]
       }
     }
+  }
+
+  return newData
+}
+
+function posterizeFilter(
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options: ProcessorOptions,
+): Uint8ClampedArray {
+  checkThatAllOptionsAreProvidedAndValid(options, processors.posterizeFilter)
+
+  const newData = new Uint8ClampedArray(data.length)
+
+  const levels = options.levels
+  const step = 255 / (levels - 1)
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    const a = data[i + 3]
+
+    const rNew = Math.round(r / step) * step
+    const gNew = Math.round(g / step) * step
+    const bNew = Math.round(b / step) * step
+
+    newData[i] = rNew
+    newData[i + 1] = gNew
+    newData[i + 2] = bNew
+    newData[i + 3] = a
   }
 
   return newData

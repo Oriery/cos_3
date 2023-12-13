@@ -6,7 +6,7 @@
         label="Image URL"
       />
     </div>
-    <div class="flex flex-row gap-2 p-2 bg-blue-700 rounded">
+    <div class="flex flex-row gap-2 p-2 bg-blue-700 rounded align-start">
       <ImageComponent
         :image-path="imageUrl"
         :key="imageUrl"
